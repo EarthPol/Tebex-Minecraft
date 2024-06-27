@@ -8,6 +8,7 @@ import io.tebex.plugin.event.JoinListener;
 import io.tebex.plugin.gui.BuyGUI;
 import io.tebex.plugin.manager.CommandManager;
 import io.tebex.plugin.placeholder.BukkitNamePlaceholder;
+import io.tebex.plugin.scheduling.FoliaTaskScheduler;
 import io.tebex.sdk.SDK;
 import io.tebex.sdk.Tebex;
 import io.tebex.sdk.obj.Category;
@@ -50,6 +51,8 @@ public final class TebexPlugin extends JavaPlugin implements Platform {
     private PlaceholderManager placeholderManager;
     private Map<Object, Integer> queuedPlayers;
     private YamlDocument configYaml;
+
+    private FoliaTaskScheduler scheduler;
 
     private ServerInformation storeInformation;
     private List<Category> storeCategories;
@@ -97,23 +100,9 @@ public final class TebexPlugin extends JavaPlugin implements Platform {
 
         registerEvents(new JoinListener(this));
 
-        getServer().getScheduler().runTaskTimerAsynchronously(this, this::refreshListings, 0, 20 * 60 * 5);
+        scheduler = new FoliaTaskScheduler(this);
 
-        getServer().getScheduler().runTaskTimerAsynchronously(this, () -> {
-            List<ServerEvent> runEvents = Lists.newArrayList(serverEvents.subList(0, Math.min(serverEvents.size(), 750)));
-            if (runEvents.isEmpty()) return;
-            if (!this.isSetup()) return;
-
-            sdk.sendEvents(runEvents)
-                    .thenAccept(aVoid -> {
-                        serverEvents.removeAll(runEvents);
-                        debug("Successfully sent analytics.");
-                    })
-                    .exceptionally(throwable -> {
-                        debug("Failed to send analytics: " + throwable.getMessage());
-                        return null;
-                    });
-        }, 0, 20 * 60);
+        refreshTaskTimers();
 
         // Register the custom /buy command
         try {
@@ -207,6 +196,47 @@ public final class TebexPlugin extends JavaPlugin implements Platform {
         } catch (IOException e) {
             warning("Failed to migrate config: " + e.getMessage());
             e.printStackTrace();
+        }
+    }
+
+    private void refreshTaskTimers() {
+        // Using Folia scheduler for asynchronous task timer
+        if (scheduler != null) {
+            scheduler.runAsyncRepeating(task -> refreshListings(), 0L, 20L * 60L * 5L, TimeUnit.MILLISECONDS);
+
+            scheduler.runAsyncRepeating(task -> {
+                List<ServerEvent> runEvents = Lists.newArrayList(serverEvents.subList(0, Math.min(serverEvents.size(), 750)));
+                if (runEvents.isEmpty()) return;
+                if (!this.isSetup()) return;
+
+                sdk.sendEvents(runEvents)
+                        .thenAccept(aVoid -> {
+                            serverEvents.removeAll(runEvents);
+                            debug("Successfully sent analytics.");
+                        })
+                        .exceptionally(throwable -> {
+                            debug("Failed to send analytics: " + throwable.getMessage());
+                            return null;
+                        });
+            }, 0L, 20L * 60L, TimeUnit.MILLISECONDS);
+        } else {
+            getServer().getScheduler().runTaskTimerAsynchronously(this, this::refreshListings, 0L, 20L * 60L * 5L);
+
+            getServer().getScheduler().runTaskTimerAsynchronously(this, () -> {
+                List<ServerEvent> runEvents = Lists.newArrayList(serverEvents.subList(0, Math.min(serverEvents.size(), 750)));
+                if (runEvents.isEmpty()) return;
+                if (!this.isSetup()) return;
+
+                sdk.sendEvents(runEvents)
+                        .thenAccept(aVoid -> {
+                            serverEvents.removeAll(runEvents);
+                            debug("Successfully sent analytics.");
+                        })
+                        .exceptionally(throwable -> {
+                            debug("Failed to send analytics: " + throwable.getMessage());
+                            return null;
+                        });
+            }, 0L, 20L * 60L);
         }
     }
 
@@ -304,28 +334,44 @@ public final class TebexPlugin extends JavaPlugin implements Platform {
     public void executeAsync(Runnable runnable) {
         if (!isEnabled()) return;
 
-        getServer().getScheduler().runTaskAsynchronously(this, runnable);
+        if (scheduler != null) {
+            scheduler.runAsync(runnable);
+        } else {
+            getServer().getScheduler().runTaskAsynchronously(this, runnable);
+        }
     }
 
     @Override
     public void executeAsyncLater(Runnable runnable, long time, TimeUnit unit) {
         if (!isEnabled()) return;
 
-        getServer().getScheduler().runTaskLaterAsynchronously(this, runnable, unit.toMillis(time) / 50);
+        if (scheduler != null) {
+            scheduler.runAsyncLater(runnable, unit.toMillis(time));
+        } else {
+            getServer().getScheduler().runTaskLaterAsynchronously(this, runnable, unit.toMillis(time) / 50);
+        }
     }
 
     @Override
     public void executeBlocking(Runnable runnable) {
         if (!isEnabled()) return;
 
-        getServer().getScheduler().runTask(this, runnable);
+        if (scheduler != null) {
+            scheduler.run(runnable);
+        } else {
+            getServer().getScheduler().runTask(this, runnable);
+        }
     }
 
     @Override
     public void executeBlockingLater(Runnable runnable, long time, TimeUnit unit) {
         if (!isEnabled()) return;
 
-        getServer().getScheduler().runTaskLater(this, runnable, unit.toMillis(time) / 50);
+        if (scheduler != null) {
+            scheduler.runLater(runnable, unit.toMillis(time));
+        } else {
+            getServer().getScheduler().runTaskLater(this, runnable, unit.toMillis(time) / 50);
+        }
     }
 
     public Player getPlayer(Object player) {

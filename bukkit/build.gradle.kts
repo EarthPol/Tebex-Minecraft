@@ -9,7 +9,8 @@ dependencies {
     implementation("com.github.cryptomorin:XSeries:9.3.1") { isTransitive = false }
     implementation("dev.triumphteam:triumph-gui:3.1.2")
 
-    compileOnly("org.spigotmc:spigot-api:1.8.8-R0.1-SNAPSHOT")
+    //compileOnly("io.papermc.paper:paper-api:1.20.6-R0.1-SNAPSHOT")
+    compileOnly("dev.folia:folia-api:1.20.4-R0.1-SNAPSHOT")
     compileOnly("dev.dejvokep:boosted-yaml:1.3")
     compileOnly("me.clip:placeholderapi:2.11.3")
 }

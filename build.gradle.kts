@@ -9,16 +9,16 @@ plugins {
 defaultTasks("shadowJar")
 
 group = "io.tebex"
-version = "2.0.5"
+version = "2.0.5-folia"
 
 subprojects {
     plugins.apply("java")
     plugins.apply("com.github.johnrengelman.shadow")
 
     java {
-        toolchain.languageVersion.set(JavaLanguageVersion.of(8))
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        toolchain.languageVersion.set(JavaLanguageVersion.of(17))
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 
     tasks.named("shadowJar", ShadowJar::class.java) {
@@ -47,6 +47,10 @@ subprojects {
         }
         maven("https://maven.nucleoid.xyz/") {
             name = "nucleoid"
+        }
+        maven {
+            name = "paper"
+            url = uri("https://papermc.io/repo/repository/maven-public/")
         }
     }
 
